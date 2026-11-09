@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PurityScan — Liquid Compatibility Matrix</title>
+<style>
+:root{--bg:#f2f5f3;--ink:#13201b;--mute:#52635b;--line:#c9d5cf;--card:#fff;--accent:#0e6b5b;--ok:#17703f;--warn:#9a6200;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1713;--ink:#e6f0ea;--mute:#93a79d;--line:#2a3a33;--card:#16221c;--accent:#4fc3a8;--ok:#5fd18c;--warn:#e3a53a;--bad:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif}
+main{max-width:46rem;margin:0 auto;padding:1.5rem 1rem 4rem}
+nav{margin-bottom:1.5rem}
+nav a{color:var(--accent);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:.3rem}
+nav a:hover{text-decoration:underline}
+h1{font-size:2rem;margin:0}
+.sub{color:var(--mute);margin:.25rem 0 1.5rem}
+h2{font-size:1.15rem;margin:0 0 .5rem}
+h3{font-size:1rem;margin:1rem 0 .3rem;color:var(--ink)}
+p{margin:.3rem 0}
+.list{list-style:none;margin:0 0 1.5rem;padding:0;display:grid;gap:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);padding:1.1rem;border-radius:6px}
+.card.verified{border-left-color:var(--ok)}
+.card.unsupported{border-left-color:var(--bad)}
+.tag{display:inline-block;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:.15rem .45rem;border-radius:4px;margin-bottom:.5rem}
+.tag.ok{background:rgba(23,112,63,.12);color:var(--ok)}
+.tag.bad{background:rgba(179,38,30,.12);color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:.6rem;margin-top:.6rem;font-size:.9rem}
+.grid div{background:var(--bg);padding:.6rem .8rem;border-radius:4px;border:1px solid var(--line)}
+.grid strong{display:block;color:var(--mute);font-size:.8rem;margin-bottom:.2rem}
+.note-box{background:var(--card);border:1px solid var(--line);padding:1rem;border-radius:6px;margin-top:1.5rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<nav><a href="index.html">&larr; Back to Live Scanner</a></nav>
+
+<h1>Supported Liquids & Detection Matrix</h1>
+<p class="sub">PurityScan verifies liquid integrity through non-contact 650 nm transmission attenuation (Beer-Lambert law) and 45°–90° lateral scattering (Rayleigh-Mie theory). Below is the comprehensive classification matrix.</p>
+
+<h2>Tested & Compatible Household Fluids</h2>
+<ul class="list">
+
+<li class="card verified">
+<span class="tag ok">Fully Supported</span>
+<h2>1. Dairy & Emulsions (Fresh & Packaged Milk)</h2>
+<p>Emulsions contain natural micellar proteins and suspended fat globules. Any disruption of this colloidal balance alters the lateral scatter signature.</p>
+<div class="grid">
+<div><strong>Detected Adulterants</strong>Detergent / soap surfactants, excessive water dilution, starch, urea frothing agents, unrefined palm oil.</div>
+<div><strong>Optical Signature</strong>Detergents cause micellar fragmentation, driving an acute spike in S2 (lateral scatter). Excess water alters baseline S1 transmittance.</div>
+</div>
+</li>
+
+<li class="card verified">
+<span class="tag ok">Fully Supported</span>
+<h2>2. Edible Cooking Oils (Mustard, Olive, Sunflower)</h2>
+<p>Pure edible oils possess a defined refractive index and specific optical density profiles at 650 nm.</p>
+<div class="grid">
+<div><strong>Detected Adulterants</strong>Cheap mineral oils, adulterant argemone oil cuts, unauthorized colorant dyes, synthetic bulk thinners.</div>
+<div><strong>Optical Signature</strong>Industrial dye cuts and foreign hydrocarbons shift direct beam transmission (S1), while micro-suspended particulates trigger S2 scatter.</div>
+</div>
+</li>
+
+<li class="card verified">
+<span class="tag ok">Fully Supported</span>
+<h2>3. Natural Honey & Heavy Syrups</h2>
+<p>Pure honey exhibits high optical density and consistent solute transparency under focused laser beams.</p>
+<div class="grid">
+<div><strong>Detected Adulterants</strong>Invert sugar syrup dilution, high-fructose corn syrup (HFCS), excess moisture/water blending.</div>
+<div><strong>Optical Signature</strong>Moisture dilution increases direct transmission (S1); unrefined corn syrup creates micro-turbidity that elevates S2.</div>
+</div>
+</li>
+
+<li class="card verified">
+<span class="tag ok">Fully Supported</span>
+<h2>4. Drinking Water & Municipal Supply</h2>
+<p>Clean water provides minimal scatter and maximum 650 nm transmission, serving as an optimal baseline.</p>
+<div class="grid">
+<div><strong>Detected Contaminants</strong>Suspended pipe rust (colloidal iron), micro-algae, clay/silt runoff, trace surfactant/detergent contamination.</div>
+<div><strong>Optical Signature</strong>S1 direct transmission drops according to particulate concentration; S2 immediately registers lateral Rayleigh-Mie scattering.</div>
+</div>
+</li>
+
+<li class="card verified">
+<span class="tag ok">Fully Supported</span>
+<h2>5. Packaged Vinegar & Clear Fruit Juices</h2>
+<p>Standardized acidic solutions and refined juices maintain uniform chromophore density.</p>
+<div class="grid">
+<div><strong>Detected Adulterants</strong>Synthetic chemical dyes, clouding agents, non-standard water dilution, suspended particulate haze.</div>
+<div><strong>Optical Signature</strong>Direct absorbance drops along the 650 nm optical axis (Beer-Lambert attenuation) when color additives or particulate clouds are introduced.</div>
+</div>
+</li>
+
+</ul>
+
+<h2>Theoretical Boundaries & Unsupported Fluids</h2>
+<ul class="list">
+<li class="card unsupported">
+<span class="tag bad">Unsupported by Design</span>
+<h2>Clear Homogeneous Molecular Solutions</h2>
+<p>PurityScan cannot differentiate dissolved ionic salts or clear alcohol when mixed into pure water.</p>
+<div class="grid">
+<div><strong>Examples</strong>Sodium chloride (table salt) solutions, clear ethyl alcohol / ethanol dilution, pure dissolved sugar solutions.</div>
+<div><strong>Physical Reason</strong>Salt and alcohol form true molecular solutions rather than colloidal suspensions. They have zero chromophore absorption at 650 nm and produce no particle scattering. At 0° normal beam incidence, refractive changes do not bend the beam.</div>
+</div>
+</li>
+</ul>
+
+<div class="note-box">
+<h3>Frontline Triage Principles</h3>
+<p>PurityScan functions as a high-speed, non-destructive optical gatekeeper. It does not replace mass spectrometry or Gerber laboratory tests, but isolates compromised batches within three seconds at distribution points before fluids enter the consumer supply chain.</p>
+</div>
+
+</main>
+</body>
+</html>
