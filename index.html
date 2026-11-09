@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PurityScan</title>
+<style>
+:root{--bg:#f2f5f3;--ink:#13201b;--mute:#52635b;--line:#c9d5cf;--card:#fff;--accent:#0e6b5b;--ok:#17703f;--warn:#9a6200;--bad:#b3261e}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1713;--ink:#e6f0ea;--mute:#93a79d;--line:#2a3a33;--card:#16221c;--accent:#4fc3a8;--ok:#5fd18c;--warn:#e3a53a;--bad:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Atkinson Hyperlegible","Segoe UI",system-ui,sans-serif}
+main{max-width:46rem;margin:0 auto;padding:1.5rem 1rem 4rem}
+h1{font-size:2rem;margin:0}
+.sub{color:var(--mute);margin:.25rem 0 1.5rem}
+ol{list-style:none;margin:0;padding:0;display:grid;gap:.9rem}
+li{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);padding:1rem;border-radius:6px}
+li.done{border-left-color:var(--ok)}
+h2{font-size:1.05rem;margin:0 0 .4rem}
+p{margin:.3rem 0}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--accent);color:var(--bg);border:0;border-radius:6px;padding:.55rem .9rem;cursor:pointer;margin:.3rem .4rem .3rem 0}
+button.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input,select{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:.45rem .6rem;width:100%;max-width:22rem}
+.out{color:var(--mute);min-height:1.4em;white-space:pre-wrap}
+.verdict{font-size:1.6rem;font-weight:700;margin:.4rem 0}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.row{display:flex;gap:.8rem;flex-wrap:wrap}.row label{flex:1;min-width:8rem;font-size:.9rem;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<h1>PurityScan</h1>
+<p class="sub">Compares a liquid against a clean reference using a laser. It flags cloudiness and colour. It cannot detect clear liquids such as salt water or alcohol.</p>
+
+<ol>
+<li id="s1"><h2>Connect your device</h2>
+<p>Plug the Arduino in with the USB cable, then pick its port. Works in desktop Chrome or Edge.</p>
+<button id="bConnect">Connect Arduino</button>
+<p class="out" id="oConnect"></p></li>
+
+<li id="s2"><h2>Check the buzzer</h2>
+<button id="bBeep" disabled>Play test beep</button>
+<span id="beepAsk" hidden>Did it ring?
+<button id="bYes" class="alt">Yes</button><button id="bNo" class="alt">No</button></span>
+<p class="out" id="oBeep"></p></li>
+
+<li id="s3"><h2>Check laser and sensor</h2>
+<p>With an empty cup in place and the lid closed, the laser turns on for up to 60 seconds. Never look into the beam.</p>
+<button id="bLaser" disabled>Laser on and read</button><button id="bLaserOff" class="alt" disabled>Laser off</button>
+<p class="out" id="oLaser"></p></li>
+
+<li id="s4"><h2>Calibrate with the clean liquid</h2>
+<p>Fill the cup with your reference (clean water for water tests), wait 5 to 10 seconds for it to settle, then calibrate.</p>
+<button id="bCal" disabled>Calibrate</button>
+<p class="out" id="oCal"></p></li>
+
+<li id="s5"><h2>Scan a sample</h2>
+<button id="bScan" disabled>Scan</button>
+<div class="verdict" id="verdict" aria-live="polite"></div>
+<p class="out" id="oScan"></p></li>
+
+<li id="s6"><h2>Build the dataset and train</h2>
+<p>After a scan, label it and save it. Collect 20 or more per liquid, then train. The classifier learns from your own samples.</p>
+<div class="row"><label>Label<select id="label">
+<option>clean</option><option>milky</option><option>dyed</option><option>soapy</option><option>muddy</option></select></label></div>
+<button id="bSave" class="alt" disabled>Save last scan</button>
+<button id="bTrain" class="alt">Train on server</button>
+<button id="bCsv" class="alt">Download CSV</button>
+<p class="out" id="oData"></p></li>
+
+<li><h2>Settings</h2>
+<div class="row">
+<label>Server address (optional)<input id="api" placeholder="https://your-server.example.com"></label>
+<label>Suspect above (%)<input id="warn" type="number" value="12"></label>
+<label>Different above (%)<input id="fail" type="number" value="22"></label></div>
+<p class="out" id="oApi">Without a server, the verdict uses simple thresholds on this page.</p></li>
+</ol>
+</main>
+<script>
+const $=id=>document.getElementById(id), sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let port, writer, waiters=[], base=null, last=null, samples=[];
+try{$('api').value=localStorage.getItem('ps_api')||''}catch(e){}
+$('api').onchange=()=>{try{localStorage.setItem('ps_api',$('api').value.trim())}catch(e){}};
+const apiUrl=()=>$('api').value.trim().replace(/\/$/,'');
+const done=id=>$(id).classList.add('done');
+const enable=(ids,v=true)=>ids.forEach(i=>$(i).disabled=!v);
+
+async function readLoop(){
+  const dec=new TextDecoderStream(); port.readable.pipeTo(dec.writable);
+  const rd=dec.readable.getReader(); let buf='';
+  while(true){
+    const {value,done:d}=await rd.read(); if(d) break; buf+=value; let i;
+    while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).trim(); buf=buf.slice(i+1); if(line) handle(line);}
+  }
+}
+function handle(line){waiters=waiters.filter(w=>{if(line.startsWith(w.p)){clearTimeout(w.t);w.res(line);return false}return true})}
+function send(cmd,prefix,ms=6000){
+  return new Promise((res,rej)=>{
+    const w={p:prefix,res}; w.t=setTimeout(()=>{waiters=waiters.filter(x=>x!==w);rej(new Error('No reply to '+cmd+'. Check the cable and that the sketch is uploaded.'))},ms);
+    waiters.push(w); writer.write(cmd+'\n');
+  });
+}
+
+$('bConnect').onclick=async()=>{
+  if(!('serial' in navigator)){$('oConnect').textContent='This browser cannot talk to USB devices. Open this page in desktop Chrome or Edge.';return}
+  try{
+    port=await navigator.serial.requestPort(); await port.open({baudRate:9600});
+    const enc=new TextEncoderStream(); enc.readable.pipeTo(port.writable); writer=enc.writable.getWriter();
+    readLoop(); $('oConnect').textContent='Starting up...'; await sleep(2200);
+    try{await send('PING','PONG',2000)}catch(e){await send('PING','PONG',3000)}
+    $('oConnect').textContent='Connected. The Arduino answered.'; done('s1'); enable(['bBeep','bLaser','bLaserOff','bCal']);
+  }catch(e){$('oConnect').textContent=e.message||'Could not open the port.'}
+};
+
+$('bBeep').onclick=async()=>{
+  try{await send('BEEP','OK',3000); $('beepAsk').hidden=false; $('oBeep').textContent=''}catch(e){$('oBeep').textContent=e.message}
+};
+$('bYes').onclick=()=>{$('beepAsk').hidden=true;$('oBeep').textContent='Buzzer works.';done('s2')};
+$('bNo').onclick=()=>{$('beepAsk').hidden=true;$('oBeep').textContent='Check: buzzer + leg on D8, - leg on GND. A passive buzzer gives different pitches. Then play the beep again.'};
+
+$('bLaser').onclick=async()=>{
+  try{
+    await send('L1','OK',3000); await sleep(250);
+    const r=(await send('RAW','RAW,',3000)).split(','); const a=+r[1], b=+r[2];
+    let m='Direct sensor (S1): '+a+'   Side sensor (S2): '+b+'\n';
+    m+= a<30?'S1 is too low. Aim the laser at S1 and check the wiring (LDR on 5V side, 10k to GND).':
+        a>1000?'S1 is saturated. Add layers of tracing paper over S1 until it reads about 300 to 800.':
+        'S1 is in a good range.';
+    $('oLaser').textContent=m; if(a>=30&&a<=1000) done('s3');
+  }catch(e){$('oLaser').textContent=e.message}
+};
+$('bLaserOff').onclick=async()=>{try{await send('L0','OK',3000);$('oLaser').textContent+='\nLaser off.'}catch(e){}};
+
+async function measure(){await send('L0','OK',2000);const r=(await send('READ','READ,',8000)).split(',');return{s1:+r[1],s2:+r[2]}}
+
+$('bCal').onclick=async()=>{
+  $('oCal').textContent='Measuring...'; enable(['bCal'],false);
+  try{
+    const m=await measure();
+    if(m.s1<30){$('oCal').textContent='S1 is too low ('+m.s1+'). Check alignment first.';}
+    else{base=m;$('oCal').textContent='Reference saved. S1 '+m.s1+', S2 '+m.s2;done('s4');enable(['bScan'])}
+  }catch(e){$('oCal').textContent=e.message}
+  enable(['bCal']);
+};
+
+function localVerdict(d,s){
+  const dev=Math.max(Math.abs(d),Math.abs(s)), w=+$('warn').value, f=+$('fail').value;
+  const kind=Math.abs(s)>Math.abs(d)?'scattering':'absorption';
+  return dev<w?{verdict:'Matches reference',deviation:dev,type:null}:{verdict:dev<f?'Suspect':'Different from reference',deviation:dev,type:kind};
+}
+
+$('bScan').onclick=async()=>{
+  $('verdict').textContent=''; $('oScan').textContent='Measuring...'; enable(['bScan'],false);
+  try{
+    const m=await measure();
+    const d=(base.s1-m.s1)/base.s1*100, s=(m.s2-base.s2)/base.s1*100;
+    last={d:+d.toFixed(2),s:+s.toFixed(2),s1:m.s1,s2:m.s2,b1:base.s1,b2:base.s2};
+    let res=localVerdict(d,s), note='Verdict from thresholds on this page.';
+    if(apiUrl()){
+      try{
+        const ac=new AbortController(); setTimeout(()=>ac.abort(),4000);
+        const r=await fetch(apiUrl()+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({d:last.d,s:last.s}),signal:ac.signal});
+        const j=await r.json(); res=j;
+        note=j.label?'Classifier: looks like "'+j.label+'" ('+Math.round(j.confidence*100)+'% of nearest samples, test accuracy '+Math.round(j.model_accuracy*100)+'%).':'Server has no trained model yet, so thresholds were used.';
+      }catch(e){note='Server not reachable. Used thresholds on this page.'}
+    }
+    const cls=res.verdict==='Matches reference'?'ok':res.verdict==='Suspect'?'warn':'bad';
+    $('verdict').className='verdict '+cls; $('verdict').textContent=res.verdict;
+    $('oScan').textContent='Deviation from reference: '+res.deviation.toFixed(1)+'%'+(res.type?'  ('+res.type+')':'')+'\nDirect beam change '+d.toFixed(1)+'%, scatter change '+s.toFixed(1)+'%\n'+note;
+    done('s5'); enable(['bSave']);
+  }catch(e){$('oScan').textContent=e.message}
+  enable(['bScan']);
+};
+
+$('bSave').onclick=async()=>{
+  if(!last)return; const row={label:$('label').value,...last}; samples.push(row);
+  let t='Saved locally ('+samples.length+' this session).';
+  if(apiUrl()){try{await fetch(apiUrl()+'/sample',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)});t+=' Also sent to the server.'}catch(e){t+=' Server not reachable.'}}
+  $('oData').textContent=t;
+};
+$('bTrain').onclick=async()=>{
+  if(!apiUrl()){$('oData').textContent='Enter your server address under Settings first.';return}
+  try{const j=await (await fetch(apiUrl()+'/train',{method:'POST'})).json();
+    $('oData').textContent=j.trained?'Trained. Accuracy on held-out samples: '+Math.round(j.accuracy*100)+'%. Samples: '+JSON.stringify(j.counts):'Not trained yet: '+j.reason+' '+JSON.stringify(j.counts||{})}
+  catch(e){$('oData').textContent='Server not reachable.'}
+};
+$('bCsv').onclick=()=>{
+  if(!samples.length){$('oData').textContent='No samples saved yet.';return}
+  const h='label,d,s,s1,s2,b1,b2\n'+samples.map(r=>[r.label,r.d,r.s,r.s1,r.s2,r.b1,r.b2].join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([h],{type:'text/csv'})); a.download='purityscan_samples.csv'; a.click();
+};
+</script>
+</body>
+</html>
